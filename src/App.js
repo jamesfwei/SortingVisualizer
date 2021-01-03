@@ -1,16 +1,36 @@
-import { useState, useEffect } from "react";
-import Button from "@material-ui/core/Button";
+import { useEffect, useState } from "react";
+
 import Bar from "./components/Bar";
+import Button from "@material-ui/core/Button";
+import MySnackbar from "./components/Snackbar";
+import { Typography } from "@material-ui/core";
 
-const DEFAULT_SIZE = 10;
-const DEFAULT_MIN_VALUE = 50;
-const DEFAULT_MAX_VALUE = 500;
-const DELAY = 1000;
+const DEFAULT_SIZE = 20;
+const MIN_VALUE = 50;
+const MAX_VALUE = 500;
+const DELAY = 10;
 
-function getRandomInt(min, max) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+const MENU_BUTTONS = ["+", "-", "randomize"];
+const SORTING_ALGORITHMS = ["bubble", "selection", "insertion"];
+
+function getRandomInt(lo, hi) {
+  lo = Math.ceil(lo);
+  hi = Math.floor(hi);
+  return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+}
+
+/**
+ * Generate array of random numbers between hi and lo
+ * @param {number} len length of array to generate
+ * @param {number} lo lower bound, inclusive
+ * @param {number} hi upper bound, non-inclusive
+ */
+function generateRandomArray(len, lo = MIN_VALUE, hi = MAX_VALUE) {
+  return Array.from(Array(len), () => ({
+    value: getRandomInt(lo, hi),
+    selected: false,
+    sorted: false,
+  }));
 }
 
 function swap(array, i, j) {
@@ -20,26 +40,15 @@ function swap(array, i, j) {
 }
 
 function App() {
-  function generateRandomArray(arrLength) {
-    const arr = new Array(arrLength);
-
-    for (let i = 0; i < arrLength; i++) {
-      arr[i] = {
-        value: getRandomInt(DEFAULT_MIN_VALUE, DEFAULT_MAX_VALUE),
-        selected: false,
-        sorted: false,
-      };
-    }
-
-    return arr;
-  }
-
   const [size, setSize] = useState(DEFAULT_SIZE);
   const [array, setArray] = useState(() => generateRandomArray(size));
-  // const [test, setTest] = useState([]);
-  // const [count, setCount] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [sorted, setSorted] = useState(false);
+  const [openRandomizeSnackbar, setOpenRandomizeSnackbar] = useState(false);
+  const [openWaitSnackbar, setOpenWaitSnackbar] = useState(false);
 
   useEffect(() => {
+    setSorted(false);
     setArray(generateRandomArray(size));
   }, [size]);
 
@@ -59,6 +68,69 @@ function App() {
     setArray(newArray);
   }
 
+  function wrapUp() {
+    markSorted(0, size);
+    setSorted(true);
+    setRunning(false);
+    setOpenWaitSnackbar(false);
+    setTimeout(() => console.log("Finished sorting"), DELAY);
+  }
+
+  /**
+   * Handle menu buttons
+   * @param {string} menuButton name of menu button, e.g. "+" or "randomize"
+   */
+  function handleMenuButtons(menuButton) {
+    if (running) {
+      setOpenWaitSnackbar(true);
+    } else {
+      switch (menuButton) {
+        case "+":
+          setSize(size + 1);
+          break;
+        case "-":
+          setSize(Math.max(1, size - 1));
+          break;
+        case "randomize":
+          setSorted(false);
+          setOpenRandomizeSnackbar(false);
+          setArray(generateRandomArray(size));
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  /**
+   * Handle sorting algorithms
+   * @param {string} sortingAlgorithm name of sorting algorithm, e.g. "bubble"
+   */
+  function handleSortingAlgorithms(sortingAlgorithm) {
+    if (running) {
+      setOpenWaitSnackbar(true);
+    } else if (sorted) {
+      setOpenRandomizeSnackbar(true);
+    } else {
+      console.log(`Running ${sortingAlgorithm} sort`);
+      setRunning(true);
+
+      switch (sortingAlgorithm) {
+        case "bubble":
+          bubbleSort(0, 0, false);
+          break;
+        case "selection":
+          selectionSort(0, 1, 0);
+          break;
+        case "insertion":
+          insertionSort(1, 1);
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
   /**
    * Bubble sort
    * @param i index to check for swapping with neighbor to the right
@@ -70,12 +142,10 @@ function App() {
     markSorted(size - j, size);
 
     if (j === size - 1) {
-      markSorted(0, size);
-      setTimeout(() => console.log("Finished sorting"), DELAY);
+      wrapUp();
     } else if (i === size - j - 1) {
       if (!swapped) {
-        markSorted(0, size);
-        setTimeout(() => console.log("Finished sorting"), DELAY);
+        wrapUp();
       } else {
         bubbleSort(0, j + 1, false);
       }
@@ -106,8 +176,7 @@ function App() {
     markSorted(0, i);
 
     if (i === size - 1) {
-      markSorted(0, size);
-      setTimeout(() => console.log("Finished sorting"), DELAY);
+      wrapUp();
     } else if (j === size) {
       // Swap
       const newArray = [...array];
@@ -138,11 +207,12 @@ function App() {
    */
   function insertionSort(i, j) {
     unselectAll();
-    markSorted(0, i);
+    // Mark first (i + 1) elements sorted because (i + 1)-th element is getting
+    // inserted into sorted section.
+    markSorted(0, Math.min(i + 1, size));
 
     if (i === size) {
-      markSorted(0, size);
-      setTimeout(() => console.log("Finished sorting"), DELAY);
+      wrapUp();
     } else if (j === 0) {
       insertionSort(i + 1, i + 1);
     } else {
@@ -161,23 +231,30 @@ function App() {
     }
   }
 
-  // function addElement() {
-  //   const newTest = [...test];
-  //   newTest.push(100);
-  //   setTest((test) => newTest);
-  // }
-
-  // function increment() {
-  //   setCount((count) => count + 1);
-  // }
-
   return (
-    <div>
+    <div style={{ textAlign: "center" }}>
+      <div>
+        <Typography variant="h3">Size: {size}</Typography>
+      </div>
+
+      <MySnackbar
+        open={openRandomizeSnackbar}
+        setOpen={setOpenRandomizeSnackbar}
+        message={"Randomize before attempting another sort"}
+      />
+
+      <MySnackbar
+        open={openWaitSnackbar}
+        setOpen={setOpenWaitSnackbar}
+        message={"Please wait for the current sort to finish"}
+      />
+
       <div
         style={{
           display: "flex",
+          justifyContent: "space-evenly",
           alignItems: "flex-end",
-          height: `${DEFAULT_MAX_VALUE} + 10`,
+          height: `${MAX_VALUE + 10}px`,
         }}
       >
         {array.map((value, idx) => (
@@ -191,70 +268,31 @@ function App() {
       </div>
 
       <div>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => setSize((size) => size + 1)}
-        >
-          Increase size
-        </Button>
+        <div style={{ margin: "10px" }}>
+          {MENU_BUTTONS.map((menuButton) => (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => handleMenuButtons(menuButton)}
+              key={menuButton}
+            >
+              {menuButton}
+            </Button>
+          ))}
+        </div>
 
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => setArray(generateRandomArray(size))}
-        >
-          Randomize
-        </Button>
-
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => bubbleSort(0, 0, false)}
-        >
-          Bubble sort
-        </Button>
-
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => selectionSort(0, 1, 0)}
-        >
-          Selection sort
-        </Button>
-
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => insertionSort(1, 1)}
-        >
-          Insertion sort
-        </Button>
-
-        {/* <Button
-          variant="contained"
-          color="primary"
-          onClick={() => {
-            addElement();
-            addElement();
-          }}
-        >
-          Add element
-        </Button>
-
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => {
-            increment();
-            increment();
-          }}
-        >
-          Increment count
-        </Button> */}
-
-        {/* <h1>{test.length}</h1>
-        <h1>Count: {count}</h1> */}
+        <div>
+          {SORTING_ALGORITHMS.map((sortingAlgorithm) => (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => handleSortingAlgorithms(sortingAlgorithm)}
+              key={sortingAlgorithm}
+            >
+              {sortingAlgorithm} sort
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );
