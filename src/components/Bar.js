@@ -8,7 +8,7 @@ export default function Bar({ value, selected, sorted }) {
         width: "30px",
         height: value,
         color: "#fff",
-        backgroundColor: selected ? "blue" : sorted ? "green" : "red",
+        backgroundColor: selected ? "#2196f3" : sorted ? "#4caf50" : "#f44336",
         textAlign: "center",
         borderRadius: "5px 5px 0px 0px",
       }}
